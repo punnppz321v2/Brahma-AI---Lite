@@ -994,7 +994,10 @@ class BrahmaLive:
         self._loop          = None
         self._is_speaking   = False
         self._speaking_lock = threading.Lock()
-        self._use_openrouter_first = False
+        # Main provider is now top-tools-ai.com (kimi-k2.6) via or_client;
+        # OpenRouter-first means the text path uses the main provider, and
+        # Gemini Live is used only when it can be reached.
+        self._use_openrouter_first = True
         self._pending_attention: dict | None = None
         self._pending_reply_event: dict | None = None
         self._reply_mode = False

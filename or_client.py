@@ -11,6 +11,12 @@ import requests
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("openrouter_client")
 
+# ── Main provider: OpenAI-compatible endpoint (top-tools-ai / kimi-k2.6) ──
+MAIN_PROVIDER_API_URL = "https://top-tools-ai.com/api/v1/chat/completions"
+MAIN_PROVIDER_API_KEY = "sk-34d0ffe4210601eb677135717b0d727aee41271057c5967ccf96d2f536576495"
+MAIN_PROVIDER_MODEL   = "kimi-k2.6"
+
+
 def _get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
@@ -82,12 +88,77 @@ class OpenRouterClient:
 
     def __init__(self) -> None:
         self.api_key  = _load_api_key()
+        self.main_key = MAIN_PROVIDER_API_KEY
+        self.main_headers = {
+            "Authorization": f"Bearer {self.main_key}",
+            "Content-Type":  "application/json",
+        }
         self._headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type":  "application/json",
             "HTTP-Referer":  "https://github.com/mark-xxv",
             "X-Title":       "Brahma AI - Lite",
         }
+
+    def _call_main_provider(
+        self,
+        messages: list[dict],
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        temperature: float = DEFAULT_TEMPERATURE,
+        response_format: Optional[dict] = None,
+    ) -> Optional[str]:
+        """Call the main provider (top-tools-ai.com / kimi-k2.6, OpenAI-compatible)."""
+        payload: dict = {
+            "model":       MAIN_PROVIDER_MODEL,
+            "messages":    messages,
+            "max_tokens":  max_tokens,
+            "temperature": temperature,
+        }
+        if response_format:
+            payload["response_format"] = response_format
+
+        try:
+            resp = requests.post(
+                MAIN_PROVIDER_API_URL,
+                headers=self.main_headers,
+                json=payload,
+                timeout=REQUEST_TIMEOUT,
+            )
+            if resp.status_code == 200:
+                data    = resp.json()
+                content = (
+                    data.get("choices", [{}])[0]
+                        .get("message", {})
+                        .get("content", "")
+                )
+                return content.strip() if content else None
+            logger.warning(
+                f"[MainProvider] {MAIN_PROVIDER_MODEL} → HTTP {resp.status_code}: "
+                f"{resp.text[:200]}"
+            )
+        except Exception as e:
+            logger.warning(f"[MainProvider] {MAIN_PROVIDER_MODEL} → error: {e}")
+        return None
+
+    def _call_main_provider_with_retry(
+        self,
+        messages: list[dict],
+        max_tokens: int = DEFAULT_MAX_TOKENS,
+        temperature: float = DEFAULT_TEMPERATURE,
+        response_format: Optional[dict] = None,
+    ) -> str:
+        for attempt in range(1, MAX_RETRIES_PER_MODEL + 1):
+            result = self._call_main_provider(
+                messages, max_tokens, temperature, response_format
+            )
+            if result:
+                return result
+            if attempt < MAX_RETRIES_PER_MODEL:
+                time.sleep(RETRY_DELAY)
+        raise RuntimeError(
+            "[MainProvider] All attempts to "
+            f"{MAIN_PROVIDER_MODEL} @ {MAIN_PROVIDER_API_URL} failed."
+        )
 
     def _is_rate_limited(self, model: str) -> bool:
         ts = _rate_limited.get(model)
@@ -229,6 +300,15 @@ class OpenRouterClient:
             {"role": "system", "content": system},
             {"role": "user",   "content": prompt},
         ]
+        # Main provider first (kimi-k2.6 @ top-tools-ai.com); OpenRouter as fallback.
+        try:
+            result = self._call_main_provider_with_retry(
+                messages, max_tokens, temperature
+            )
+            if result:
+                return result
+        except Exception as e:
+            logger.info(f"[MainProvider] Failed, falling back to OpenRouter: {e}")
         return self._call_with_fallback(
             TEXT_MODELS, messages, model, max_tokens, temperature
         )
@@ -247,9 +327,20 @@ class OpenRouterClient:
             {"role": "system", "content": system},
             {"role": "user",   "content": prompt},
         ]
-        raw = self._call_with_fallback(
-            TEXT_MODELS, messages, model, max_tokens, temperature=0.2
-        )
+        raw = None
+        try:
+            result = self._call_main_provider_with_retry(
+                messages, max_tokens, temperature=0.2, response_format=response_format
+            )
+            if result:
+                raw = result
+        except Exception as e:
+            logger.info(f"[MainProvider] Failed, falling back to OpenRouter: {e}")
+        if raw is None:
+            raw = self._call_with_fallback(
+                TEXT_MODELS, messages, model, max_tokens, temperature=0.2,
+                response_format=response_format,
+            )
 
         clean = raw.strip()
         if clean.startswith("```"):
