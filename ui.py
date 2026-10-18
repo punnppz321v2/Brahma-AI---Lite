@@ -480,7 +480,7 @@ def _default_app_settings() -> dict:
         "launcher_pos": None,
         "launch_minimized": False,
         "check_updates_on_startup": True,
-        "default_ai_provider": "Gemini",
+        "default_ai_provider": "Kimi",
         "auto_provider_switch": True,
         "attention_message_prompts": True,
         "attention_call_prompts": True,
@@ -4099,7 +4099,7 @@ class SetupOverlay(QWidget):
         sep.setStyleSheet(f"color: {C.BORDER};"); layout.addWidget(sep)
         layout.addSpacing(4)
 
-        layout.addWidget(_lbl("GEMINI API KEY", 8, color=C.TEXT_DIM,
+        layout.addWidget(_lbl("GEMINI API KEY (voice / optional)", 8, color=C.TEXT_DIM,
                                align=Qt.AlignmentFlag.AlignLeft))
         self._key_input = QLineEdit()
         self._key_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -4163,7 +4163,7 @@ class SetupOverlay(QWidget):
         self._sel(os_default)
         layout.addSpacing(12)
 
-        self._status = QLabel("Enter your Gemini key to continue. OpenRouter remains optional; the assistant uses the shared app configuration.")
+        self._status = QLabel("Kimi main provider (kimi-k2.6) is preconfigured. Gemini key is optional (live voice); OpenRouter remains optional.")
         self._status.setWordWrap(True)
         self._status.setFont(QFont("Courier New", 8))
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -4211,15 +4211,8 @@ class SetupOverlay(QWidget):
     def _submit(self):
         key = self._key_input.text().strip()
         or_key = self._or_input.text().strip()
-        if not key:
-            self._key_input.setStyleSheet(
-                self._key_input.styleSheet() +
-                f" QLineEdit {{ border: 1px solid {C.RED}; }}"
-            )
-            self._status.setText("Gemini key is required.")
-            return
         if or_key and not or_key.startswith("sk-or-"):
-            self._status.setText("OpenRouter key looks invalid. Continuing with Gemini only.")
+            self._status.setText("OpenRouter key looks invalid. Continuing with Kimi main provider only.")
             or_key = ""
         else:
             self._status.setText("Saving settings...")
@@ -6190,7 +6183,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, "_core_sub_lbl") and self._core_sub_lbl is not None:
             self._core_sub_lbl.setText("Ready to assist.")
         if hasattr(self, "_core_status_lbl") and self._core_status_lbl is not None:
-            self._core_status_lbl.setText("Brahma is ready. Gemini 2.5 Flash · OpenRouter · Voice Connected · Memory Enabled")
+            self._core_status_lbl.setText("Brahma is ready. Kimi K2.6 · OpenRouter · Voice Connected · Memory Enabled")
         if hasattr(self, "_cpu_lbl") and self._cpu_lbl is not None:
             self._cpu_lbl.setText(f"CPU {int(psutil.cpu_percent(interval=None))}%")
         if hasattr(self, "_ram_lbl") and self._ram_lbl is not None:
@@ -7085,7 +7078,7 @@ class MainWindow(QMainWindow):
         name = QLabel("Brahma AI - Lite")
         name.setFont(QFont("Segoe UI", 9))
         name.setStyleSheet(f"color: {C.TEXT_MED};")
-        ver = QLabel("Version 1.0.0 • Gemini 2.5 Flash")
+        ver = QLabel("Version 1.0.0 • Kimi K2.6")
         ver.setFont(QFont("Segoe UI", 8))
         ver.setStyleSheet(f"color: {C.TEXT_DIM};")
         status_lay.addWidget(online)
@@ -7122,7 +7115,7 @@ class MainWindow(QMainWindow):
         self._core_sub_lbl = QLabel("Ready to assist.")
         self._core_sub_lbl.setFont(QFont("Segoe UI", 9))
         self._core_sub_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
-        self._core_status_lbl = QLabel("Brahma is ready. Gemini 2.5 Flash · OpenRouter · Voice Connected · Memory Enabled")
+        self._core_status_lbl = QLabel("Brahma is ready. Kimi K2.6 · OpenRouter · Voice Connected · Memory Enabled")
         self._core_status_lbl.setWordWrap(True)
         self._core_status_lbl.setFont(QFont("Segoe UI", 8))
         self._core_status_lbl.setStyleSheet(f"color: #9da8b7; background: transparent;")
@@ -7595,7 +7588,7 @@ class SystemConnectivitySidebar(QFrame):
         if self._bridge() and hasattr(self._bridge(), "_win"):
             version = "v1.0.0"
             platform_name = platform.system()
-            provider = self._bridge()._win._load_app_settings().get("default_ai_provider", "Gemini")
+            provider = self._bridge()._win._load_app_settings().get("default_ai_provider", "Kimi")
             last_updated = time.strftime("%d %b %Y %H:%M")
             self._info_rows["Version"].setText(version)
             self._info_rows["Platform"].setText(platform_name)
@@ -7604,7 +7597,7 @@ class SystemConnectivitySidebar(QFrame):
         else:
             self._info_rows["Version"].setText("v1.0.0")
             self._info_rows["Platform"].setText(platform.system())
-            self._info_rows["Current AI Provider"].setText("Gemini")
+            self._info_rows["Current AI Provider"].setText("Kimi")
             self._info_rows["Last Updated"].setText(time.strftime("%d %b %Y %H:%M"))
 
 
@@ -7796,13 +7789,13 @@ class SystemConnectivityPage(QWidget):
         lay1 = card.layout()
         self._api_defaults = self._load_api_defaults()
         self._gemini_row, self._gemini_status, self._gemini_key = self._provider_row(
-            "Google Gemini",
+            "Kimi (main provider)",
             self._api_defaults.get("gemini_api_key", ""),
-            "gemini-2.5-flash",
+            "kimi-k2.6",
             "gemini",
         )
         self._or_row, self._or_status, self._or_key = self._provider_row(
-            "OpenRouter",
+            "OpenRouter (fallback)",
             self._api_defaults.get("openrouter_api_key", ""),
             "auto",
             "openrouter",
@@ -7812,8 +7805,8 @@ class SystemConnectivityPage(QWidget):
         controls = QHBoxLayout()
         controls.setSpacing(12)
         self._default_provider = QComboBox()
-        self._default_provider.addItems(["Google Gemini", "OpenRouter"])
-        self._default_provider.setCurrentText("Google Gemini" if self._load_app_settings().get("default_ai_provider", "Gemini") in {"Gemini", "Google Gemini"} else "OpenRouter")
+        self._default_provider.addItems(["Kimi (kimi-k2.6)", "OpenRouter"])
+        self._default_provider.setCurrentText("Kimi (kimi-k2.6)" if self._load_app_settings().get("default_ai_provider", "Kimi") in {"Kimi", "Gemini", "Google Gemini"} else "OpenRouter")
         self._default_provider.currentTextChanged.connect(self._set_default_provider)
         controls.addWidget(QLabel("Default AI Provider"))
         controls.addWidget(self._default_provider, 1)
@@ -8073,7 +8066,8 @@ class SystemConnectivityPage(QWidget):
 
     def _test_provider(self, setting_key: str):
         if setting_key == "gemini":
-            msg = "Google Gemini key detected." if self._load_api_defaults().get("gemini_api_key") else "Google Gemini key missing."
+            # Main provider (Kimi k2.6 @ top-tools-ai.com) key is hardcoded in or_client.
+            msg = "Kimi main provider key active."
         else:
             msg = "OpenRouter key detected." if self._load_api_defaults().get("openrouter_api_key") else "OpenRouter key missing."
         if self._ctrl() and hasattr(self._ctrl(), "write_log"):
@@ -8130,7 +8124,7 @@ class SystemConnectivityPage(QWidget):
             self._ctrl()._win._refresh_startup_animation_button()
 
     def _set_default_provider(self, text: str):
-        provider = "Gemini" if (text or "").strip().lower().startswith("google") else "OpenRouter"
+        provider = "Kimi" if (text or "").strip().lower().startswith(("kimi", "google")) else "OpenRouter"
         self._set_setting("default_ai_provider", provider)
         if self._ctrl() and hasattr(self._ctrl(), "write_log"):
             self._ctrl().write_log(f"SYS: Default AI provider set to {provider}.")
@@ -8246,7 +8240,7 @@ class SystemConnectivityPage(QWidget):
             self._or_status.setText("Connected" if api.get("openrouter_api_key") else "Not connected")
             self._gemini_key.setText(self._provider_key_preview(api.get("gemini_api_key", "")))
             self._or_key.setText(self._provider_key_preview(api.get("openrouter_api_key", "")))
-            self._default_provider.setCurrentText("Google Gemini" if app.get("default_ai_provider", "Gemini") == "Gemini" else "OpenRouter")
+            self._default_provider.setCurrentText("Kimi (kimi-k2.6)" if app.get("default_ai_provider", "Kimi") in {"Kimi", "Gemini"} else "OpenRouter")
             self._auto_switch_btn.setChecked(bool(app.get("auto_provider_switch", True)))
             self._attention_message_btn.setChecked(bool(app.get("attention_message_prompts", True)))
             self._attention_call_btn.setChecked(bool(app.get("attention_call_prompts", True)))
@@ -8284,7 +8278,7 @@ class SystemConnectivityPage(QWidget):
             self._discord_status.setText("Bot Status: Offline")
             self._discord_msg.setText("Token required")
         if self._ctrl() and hasattr(self._ctrl(), "_win"):
-            self._sys_provider.setText("Gemini" if app.get("default_ai_provider", "Gemini") == "Gemini" else "OpenRouter")
+            self._sys_provider.setText("Kimi" if app.get("default_ai_provider", "Kimi") in {"Kimi", "Gemini"} else "OpenRouter")
 
     def _handle_create_desktop_shortcut(self):
         success, path_or_err = self._create_desktop_shortcut_logic()

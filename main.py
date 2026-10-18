@@ -1550,18 +1550,11 @@ class BrahmaLive:
             except Exception:
                 pass
             reply = ""
-            gemini_first = not self._use_openrouter_first
+            main_provider_first = self._use_openrouter_first
             request_text = f"{memory_ctx}\n\nCurrent User Request:\n{text}" if memory_ctx else text
 
-            if gemini_first:
-                try:
-                    reply = _gemini_text_reply(request_text)
-                except Exception as e:
-                    print(f"[BRAHMA] ⚠️ Gemini fallback failed: {e}")
-                    if _is_gemini_limit_error(e):
-                        self._use_openrouter_first = True
-
-            if not reply:
+            if main_provider_first:
+                # Main provider: top-tools-ai.com (kimi-k2.6), OpenRouter fallback.
                 try:
                     reply = openrouter_client.chat(
                         request_text,
@@ -1571,9 +1564,13 @@ class BrahmaLive:
                         ),
                     )
                 except Exception as e:
-                    print(f"[BRAHMA] ⚠️ OpenRouter fallback failed: {e}")
-                    if gemini_first and not self._use_openrouter_first and _is_gemini_limit_error(e):
-                        self._use_openrouter_first = True
+                    print(f"[BRAHMA] ⚠️ Main provider reply failed: {e}")
+
+            if not reply:
+                try:
+                    reply = _gemini_text_reply(request_text)
+                except Exception as e:
+                    print(f"[BRAHMA] ⚠️ Gemini fallback failed: {e}")
             reply = (reply or "").strip()
             if not reply:
                 reply = "I’m ready, sir."
@@ -2099,10 +2096,9 @@ class BrahmaLive:
                         pass
                     
             except Exception as e:
-                print(f"[BRAHMA] ⚠️ {e}")
-                traceback.print_exc()
-                if _is_gemini_limit_error(e):
-                    self._use_openrouter_first = True
+                print(f"[BRAHMA] ⚠️ Voice session (Gemini Live) unavailable: {e}")
+                # Main provider text path remains active; keep OpenRouter-first mode.
+                self._use_openrouter_first = True
                 self.session = None
                 self._loop = None
             self.set_speaking(False)
