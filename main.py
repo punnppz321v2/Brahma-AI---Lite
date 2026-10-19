@@ -10,6 +10,7 @@ import time
 import random
 import traceback
 import os
+import warnings
 from pathlib import Path
 
 try:
@@ -17,6 +18,10 @@ try:
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
+
+# Suppress a harmless informational UserWarning emitted when pywinauto probes
+# COM threading mode at import time. It does not affect functionality.
+warnings.filterwarnings("ignore", message="Revert to STA COM threading mode")
 
 import sounddevice as sd
 from google import genai
@@ -1601,15 +1606,20 @@ class BrahmaLive:
             self.ui.set_state("LISTENING")
 
     def speak(self, text: str):
-        if not self._loop or not self.session:
-            return
-        asyncio.run_coroutine_threadsafe(
-            self.session.send_client_content(
-                turns={"parts": [{"text": text}]},
-                turn_complete=True
-            ),
-            self._loop
-        )
+        if self._loop and self.session:
+            asyncio.run_coroutine_threadsafe(
+                self.session.send_client_content(
+                    turns={"parts": [{"text": text}]},
+                    turn_complete=True
+                ),
+                self._loop
+            )
+        else:
+            # No live voice session — fall back to edge-tts for spoken output.
+            try:
+                speak_native(text)
+            except Exception as exc:
+                print(f"[BRAHMA] ⚠️ TTS fallback failed: {exc}")
 
     def speak_error(self, tool_name: str, error: str):
         short = str(error)[:120]
@@ -2049,7 +2059,10 @@ class BrahmaLive:
             http_options={"api_version": "v1beta"}
         )
 
+        live_dead = False  # stop retrying the Gemini Live voice session permanently
         while True:
+            if live_dead:
+                break
             try:
                 print("[BRAHMA] 🔌 Connecting...")
                 self.ui.set_state("THINKING")
@@ -2094,17 +2107,52 @@ class BrahmaLive:
                         await connect_cm.__aexit__(None, None, None)
                     except Exception:
                         pass
-                    
+
             except Exception as e:
                 print(f"[BRAHMA] ⚠️ Voice session (Gemini Live) unavailable: {e}")
                 # Main provider text path remains active; keep OpenRouter-first mode.
                 self._use_openrouter_first = True
                 self.session = None
                 self._loop = None
+                # Permanently stop retrying when the Gemini key is dead (quota/
+                # access issues). The OpenAI-compatible main provider still works
+                # for all text, and edge-tts handles spoken output.
+                msg = str(e).lower()
+                if any(t in msg for t in (
+                    "prepayment", "credit", "billed", "billing", "quota",
+                    "access denied", "permission denied", "401", "403",
+                    "invalid_api_key", "api key", "1011",
+                )):
+                    live_dead = True
+                    print("[BRAHMA] ⚠️ Voice session permanently unavailable; "
+                          "using text-only mode with main provider + edge-tts.")
+                    try:
+                        self.ui.boot_set_step_status("Connect AI backend", "done")
+                        self.ui.boot_set_progress(92, "Text-only mode (main provider)")
+                        self.ui.write_log(
+                            "SYS: Voice backend (Gemini Live) unavailable. "
+                            "Running in text-only mode with Kimi main provider; "
+                            "spoken replies use edge-tts."
+                        )
+                    except Exception:
+                        pass
+            if live_dead:
+                break
             self.set_speaking(False)
             self.ui.set_state("LISTENING")
             print("[BRAHMA] 🔄 Reconnecting in 5s...")
             await asyncio.sleep(5)
+
+        # Final startup state when voice session is unavailable
+        if live_dead:
+            self.set_speaking(False)
+            self.ui.set_state("LISTENING")
+            try:
+                self.ui.boot_set_step_status("Finalize startup", "done")
+                self.ui.boot_set_progress(100, "Startup complete (text-only)")
+            except Exception:
+                pass
+            print("[BRAHMA] ✅ Running in text-only mode. Main provider + edge-tts active.")
 
 def main():
     _startup_log("main entered")

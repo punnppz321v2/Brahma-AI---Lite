@@ -65,10 +65,15 @@ def _get_api_key() -> str:
 
 
 def _gemini_client():
-    import google.generativeai as genai
+    import sys
 
-    genai.configure(api_key=_get_api_key())
-    return genai.GenerativeModel("gemini-2.5-flash")
+    try:
+        from gemini_compat import genai_model
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from gemini_compat import genai_model
+
+    return genai_model("gemini-2.5-flash", api_key=_get_api_key())
 
 
 def _import_docx():

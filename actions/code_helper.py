@@ -37,9 +37,16 @@ def _get_api_key() -> str:
 
 
 def _get_gemini(model: str = GEMINI_MODEL):
-    import google.generativeai as genai
-    genai.configure(api_key=_get_api_key())
-    return genai.GenerativeModel(model)
+    import sys
+    from pathlib import Path
+
+    try:
+        from gemini_compat import genai_model
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from gemini_compat import genai_model
+
+    return genai_model(model)
 
 
 def _clean_code(text: str) -> str:

@@ -7,6 +7,7 @@ import os
 import platform
 import random
 import re
+import subprocess
 import sys
 import threading
 import time
@@ -4163,7 +4164,7 @@ class SetupOverlay(QWidget):
         self._sel(os_default)
         layout.addSpacing(12)
 
-        self._status = QLabel("Kimi main provider (kimi-k2.6) is preconfigured. Gemini key is optional (live voice); OpenRouter remains optional.")
+        self._status = QLabel("Kimi main provider (Kimi-K2.6) is preconfigured. Gemini key is optional (live voice); OpenRouter remains optional.")
         self._status.setWordWrap(True)
         self._status.setFont(QFont("Courier New", 8))
         self._status.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -7791,7 +7792,7 @@ class SystemConnectivityPage(QWidget):
         self._gemini_row, self._gemini_status, self._gemini_key = self._provider_row(
             "Kimi (main provider)",
             self._api_defaults.get("gemini_api_key", ""),
-            "kimi-k2.6",
+            "Kimi-K2.6",
             "gemini",
         )
         self._or_row, self._or_status, self._or_key = self._provider_row(
@@ -7805,8 +7806,8 @@ class SystemConnectivityPage(QWidget):
         controls = QHBoxLayout()
         controls.setSpacing(12)
         self._default_provider = QComboBox()
-        self._default_provider.addItems(["Kimi (kimi-k2.6)", "OpenRouter"])
-        self._default_provider.setCurrentText("Kimi (kimi-k2.6)" if self._load_app_settings().get("default_ai_provider", "Kimi") in {"Kimi", "Gemini", "Google Gemini"} else "OpenRouter")
+        self._default_provider.addItems(["Kimi (Kimi-K2.6)", "OpenRouter"])
+        self._default_provider.setCurrentText("Kimi (Kimi-K2.6)" if self._load_app_settings().get("default_ai_provider", "Kimi") in {"Kimi", "Gemini", "Google Gemini"} else "OpenRouter")
         self._default_provider.currentTextChanged.connect(self._set_default_provider)
         controls.addWidget(QLabel("Default AI Provider"))
         controls.addWidget(self._default_provider, 1)
@@ -8066,7 +8067,7 @@ class SystemConnectivityPage(QWidget):
 
     def _test_provider(self, setting_key: str):
         if setting_key == "gemini":
-            # Main provider (Kimi k2.6 @ top-tools-ai.com) key is hardcoded in or_client.
+            # Main provider (Kimi-K2.6 @ top-tools-ai.com) key is configured in or_client.
             msg = "Kimi main provider key active."
         else:
             msg = "OpenRouter key detected." if self._load_api_defaults().get("openrouter_api_key") else "OpenRouter key missing."
@@ -8240,7 +8241,7 @@ class SystemConnectivityPage(QWidget):
             self._or_status.setText("Connected" if api.get("openrouter_api_key") else "Not connected")
             self._gemini_key.setText(self._provider_key_preview(api.get("gemini_api_key", "")))
             self._or_key.setText(self._provider_key_preview(api.get("openrouter_api_key", "")))
-            self._default_provider.setCurrentText("Kimi (kimi-k2.6)" if app.get("default_ai_provider", "Kimi") in {"Kimi", "Gemini"} else "OpenRouter")
+            self._default_provider.setCurrentText("Kimi (Kimi-K2.6)" if app.get("default_ai_provider", "Kimi") in {"Kimi", "Gemini"} else "OpenRouter")
             self._auto_switch_btn.setChecked(bool(app.get("auto_provider_switch", True)))
             self._attention_message_btn.setChecked(bool(app.get("attention_message_prompts", True)))
             self._attention_call_btn.setChecked(bool(app.get("attention_call_prompts", True)))
@@ -9379,7 +9380,10 @@ class BrahmaUI:
                 kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
             subprocess.Popen(args, **kwargs)
         except Exception as exc:
-            self._win.write_log(f"ERR: Restart failed: {exc}")
+            try:
+                self._win._log.append_log(f"ERR: Restart failed: {exc}")
+            except Exception:
+                print(f"ERR: Restart failed: {exc}")
         self._app.quit()
 
     def _toggle_workspace_on_startup(self, enabled: bool):

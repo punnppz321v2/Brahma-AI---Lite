@@ -54,6 +54,18 @@ def _get_api_key() -> str:
         return json.load(f)["gemini_api_key"]
 
 
+def _compat_model(model_name: str, system_instruction: str = None):
+    import sys
+
+    try:
+        from gemini_compat import genai_model
+    except ImportError:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from gemini_compat import genai_model
+
+    return genai_model(model_name, system_instruction=system_instruction, api_key=_get_api_key())
+
+
 def analyze_error(
     step: dict,
     error: str,
@@ -78,7 +90,7 @@ def analyze_error(
             "user_message": str
         }
     """
-    import google.generativeai as genai
+    model = _compat_model("gemini-2.5-flash-lite", system_instruction=ERROR_ANALYST_PROMPT)
 
     if attempt >= max_attempts:
         print(f"[ErrorHandler] ⚠️ Max attempts reached for step {step.get('step')} — forcing replan")
@@ -89,12 +101,6 @@ def analyze_error(
             "max_retries":   0,
             "user_message":  "Trying a different approach, sir."
         }
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash-lite",
-        system_instruction=ERROR_ANALYST_PROMPT
-    )
 
     prompt = f"""Failed step:
 Tool: {step.get('tool')}
@@ -148,10 +154,7 @@ def generate_fix(step: dict, error: str, fix_suggestion: str) -> dict:
 
     Returns a modified step dict.
     """
-    import google.generativeai as genai
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash")
+    model = _compat_model("gemini-2.0-flash")
 
     prompt = f"""A task step failed. Generate a replacement step.
 

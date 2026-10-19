@@ -25,7 +25,15 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 
-import google.generativeai as genai
+import google.genai as genai
+from google.genai import types
+
+try:
+    from gemini_compat import genai_model
+except ImportError:
+    import sys as _sys
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from gemini_compat import genai_model
 
 
 def _get_api_key() -> str:
@@ -35,8 +43,7 @@ def _get_api_key() -> str:
 
 
 def _gemini_client():
-    genai.configure(api_key=_get_api_key())
-    return genai.GenerativeModel("gemini-2.5-flash")
+    return genai_model("gemini-2.5-flash")
 
 
 def _detect_type(path: Path) -> str:
@@ -100,7 +107,12 @@ def _process_image(path: Path, action: str, params: dict, speak=None) -> str:
             if params.get("instruction"):
                 prompt = params["instruction"]
 
-            response = model.generate_content([prompt, img])
+            import io
+            buf = io.BytesIO()
+            fmt = (img.format or "PNG").lower()
+            img.save(buf, format=fmt)
+            image_part = types.Part(inline_data={"mime_type": f"image/{fmt}", "data": buf.getvalue()})
+            response = model.generate_content([prompt, image_part])
             result   = response.text.strip()
 
             if len(result) > 500 and params.get("save", True):
@@ -536,7 +548,7 @@ def _process_audio(path: Path, action: str, params: dict, speak=None) -> str:
             }.get(path.suffix.lstrip(".").lower(), "audio/mpeg")
             response = model.generate_content([
                 "Transcribe all speech in this audio file accurately.",
-                {"mime_type": mime, "data": content}
+                types.Part(inline_data={"mime_type": mime, "data": content})
             ])
             result = response.text.strip()
             if params.get("save", True):

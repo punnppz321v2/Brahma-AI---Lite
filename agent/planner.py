@@ -218,14 +218,21 @@ def _rewrite_generated_step(step: dict, goal: str) -> None:
     step["parameters"] = {"query": desc[:200]}
 
 
-def create_plan(goal: str, context: str = "") -> dict:
-    import google.generativeai as genai
+def _compat_model(model_name: str, system_instruction: str = None):
+    import sys
+    from pathlib import Path as _Path
 
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash-lite",
-        system_instruction=PLANNER_PROMPT
-    )
+    try:
+        from gemini_compat import genai_model
+    except ImportError:
+        sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+        from gemini_compat import genai_model
+
+    return genai_model(model_name, system_instruction=system_instruction)
+
+
+def create_plan(goal: str, context: str = "") -> dict:
+    model = _compat_model("gemini-2.5-flash-lite", system_instruction=PLANNER_PROMPT)
 
     user_input = f"Goal: {goal}"
     if context:
@@ -288,13 +295,7 @@ def _fallback_plan(goal: str) -> dict:
 
 
 def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
-    import google.generativeai as genai
-
-    genai.configure(api_key=_get_api_key())
-    model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        system_instruction=PLANNER_PROMPT
-    )
+    model = _compat_model("gemini-2.5-flash", system_instruction=PLANNER_PROMPT)
 
     completed_summary = "\n".join(
         f"  - Step {s['step']} ({s['tool']}): DONE" for s in completed_steps

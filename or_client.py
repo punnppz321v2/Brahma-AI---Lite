@@ -14,7 +14,7 @@ logger = logging.getLogger("openrouter_client")
 # ── Main provider: OpenAI-compatible endpoint (top-tools-ai / kimi-k2.6) ──
 MAIN_PROVIDER_API_URL = "https://top-tools-ai.com/api/v1/chat/completions"
 MAIN_PROVIDER_API_KEY = "sk-34d0ffe4210601eb677135717b0d727aee41271057c5967ccf96d2f536576495"
-MAIN_PROVIDER_MODEL   = "kimi-k2.6"
+MAIN_PROVIDER_MODEL   = "Kimi-K2.6"
 
 
 def _get_base_dir() -> Path:

@@ -1,7 +1,6 @@
 sounddevice
 openai
 google-genai
-google-generativeai
 pillow
 requests
 python-kasa
